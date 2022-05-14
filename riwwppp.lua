@@ -240,7 +240,7 @@ function riwwppp.buildClass(class)
         end
 
         for _, data in ipairs(class.dataFields) do
-            if data.default then
+            if (data.default) and (not data.modifiers.const) then
                 local isString = data.modifiers.string
                 template = template .. "\tself." .. data.name .. " = " .. (isString and ('\"' .. data.default .. '\"') or data.default) .. "\n"
             end
@@ -255,7 +255,11 @@ function riwwppp.buildClass(class)
     for _, data in ipairs(class.dataFields) do
         template = template .. "\n"
         template = template .. "function " .. class.name .. ":" .. ((cm and "Get" or "get") .. capitalize(data.name)) .. "()\n"
-            template = template .. "\treturn " .. ((data.type and conversibleTypes[data.type]) and ("to" .. data.type .. "(self." .. data.name .. ")") or ("self." .. data.name)) .. "\n"
+            if data.modifiers.const then
+                template = template .. "\treturn " .. data.default .. "\n"
+            else
+                template = template .. "\treturn " .. ((data.type and conversibleTypes[data.type]) and ("to" .. data.type .. "(self." .. data.name .. ")") or ("self." .. data.name)) .. "\n"
+            end
         template = template .. "end\n"
 
         if not data.modifiers.const then
