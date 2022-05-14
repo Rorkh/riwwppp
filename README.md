@@ -7,6 +7,7 @@
   - [@field](#field-instruction)
   - [@data](#data-instruction)
 - [@data modifiers](#data-modifiers)
+- [Pragmas](#pragmas)
 - [Usage](#usage)
 - [Examples](#examples)
 
