@@ -3,10 +3,9 @@
 ## Content
 - [Exports](#exports)
 - [Instructions](#instructions)
-- [Instructions](#instructions)
- - [@constructor](#constructor-instruction)
- - [@field](#field-instruction)
- - [@data](#data-instruction)
+  - [@constructor](#constructor-instruction)
+  - [@field](#field-instruction)
+  - [@data](#data-instruction)
 - [@data modifiers](#data-modifiers)
 - [Usage](#usage)
 - [Examples](#examples)
