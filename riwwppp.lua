@@ -153,6 +153,8 @@ local conversibleTypes = {
 }
 
 local function proccessModifiers(class)
+    if not class.dataFields then return end
+
     for _, dataField in ipairs(class.dataFields) do
         local type
 
@@ -202,7 +204,7 @@ function riwwppp.parseClass(str)
     local len = #str
     local pointer = 0
 
-    local class = {}
+    local class = {fields = {}, dataFields = {}, pragma = {}}
     
     while (pointer ~= len) do
         pointer = pointer + 1
@@ -228,8 +230,8 @@ function riwwppp.buildClass(class)
 
     local constructor = (class.constructor or "new")
 
-    template = template .. "function " .. class.name .. ":" .. constructor .. "(o)\n"
-        template = template .. "\tlocal o = o or {}\n"
+    template = template .. "function " .. class.name .. ":" .. constructor .. "()\n"
+        template = template .. "\tlocal o = {}\n"
         template = template .. "\tsetmetatable(o, self)\n"
         template = template .. "\tself.__index = self\n"
 
