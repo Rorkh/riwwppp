@@ -1,11 +1,5 @@
 local riwwppp = {debug = true}
 
---[[
-    pragmas:
-        capitalizeMethods - capitalize "get" and "set" for datafields
-        safe - default safe attribute for datafields
-]]
-
 local function capitalize(str)
     str = str:gsub("(%l)(%w*)", function(a,b) return string.upper(a)..b end)
     return str
@@ -13,6 +7,10 @@ end
 
 local function ret(str)
     return load("return " .. str)()
+end
+
+local function isWhitespace(str)
+    return str:match("^%s*(.-)%s*$") == ""
 end
 
 local instructions = {
@@ -74,11 +72,8 @@ local instructions = {
 
         class.fields = class.fields or {}
 
-        local field = {}
-        field.name = name
-        if not (default:match("^%s*(.-)%s*$") == "") then
-            field.default = default
-        end
+        local field = {name = name}
+        if isWhitespace(default) then field.default = default end
         table.insert(class.fields, field)
     end,
 
@@ -127,16 +122,13 @@ local instructions = {
 
         class.dataFields = class.dataFields or {}
 
-        local dataField = {modifiers = {}}
-        dataField.name = name
+        local dataField = {modifiers = {}, name = name}
+        if not isWhitespace(default) then dataField.default = default end
 
         for mod in modifiers:gmatch("%S+") do
             dataField.modifiers[mod] = true
         end
-
-        if not (default:match("^%s*(.-)%s*$") == "") then
-            dataField.default = default
-        end
+        
         table.insert(class.dataFields, dataField)
     end,
 
