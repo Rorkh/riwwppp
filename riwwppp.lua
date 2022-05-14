@@ -277,3 +277,11 @@ function riwwppp.load(str)
     local class = riwwppp.parseClass(str)
     load(riwwppp.buildClass(class))()
 end
+
+function riwwppp.loadFile(filename)
+    local f = io.open(filename, "r")
+    riwwppp.load(f:read("*a"))
+    f:close()
+end
+
+return riwwppp
