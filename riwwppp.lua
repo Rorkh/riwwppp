@@ -138,6 +138,55 @@ local instructions = {
             dataField.default = default
         end
         table.insert(class.dataFields, dataField)
+    end,
+
+    ["method"] = function(class, value, pointer)
+        -- @method and space offset
+        class._methodStart = pointer - string.len(value)
+    end,
+
+    ["end"] = function(class, value, pointer, str)
+        -- Maybe rethink
+
+        local mStart = class._methodStart
+        class._methodStart = nil
+        local mEnd = pointer - 5
+
+        local func = str:sub(mStart, mEnd)
+        local lPointer = 0
+
+        local STATE_NAME = 1
+        local STATE_ARGS = 2
+        local STATE_BODY = 3
+
+        local state = STATE_NAME
+        local name, args, body = "", "", ""
+
+        while (lPointer ~= #func) do
+            lPointer = lPointer + 1
+            local char = string.sub(func, lPointer, lPointer)
+
+            if char == "(" and state == STATE_NAME then
+                state = STATE_ARGS
+                lPointer = lPointer + 1
+                char = string.sub(func, lPointer, lPointer)
+            end
+
+            if char == ")" and state == STATE_ARGS then
+                state = STATE_BODY
+                lPointer = lPointer + 1
+                char = string.sub(func, lPointer, lPointer)
+            end
+
+            if string.byte(char) == 10 and state == STATE_NAME then state = STATE_BODY end
+
+            if state == STATE_BODY then body = body .. char end
+            if state == STATE_ARGS then args = args .. char end
+            if state == STATE_NAME then name = name .. char end
+        end
+
+        local method = {name = name, body = body, args = args}
+        table.insert(class.methods, method)
     end
 }
 
@@ -192,7 +241,7 @@ local function instruction(class, str, pointer, len)
     end
     
     if instructions[name] then
-        instructions[name](class, value)
+        instructions[name](class, value, pointer, str)
     else
         print("Unknown instruction " .. name .. " used")
     end
@@ -204,7 +253,7 @@ function riwwppp.parseClass(str)
     local len = #str
     local pointer = 0
 
-    local class = {fields = {}, dataFields = {}, pragma = {}}
+    local class = {fields = {}, dataFields = {}, pragma = {}, methods = {}}
     
     while (pointer ~= len) do
         pointer = pointer + 1
@@ -270,6 +319,13 @@ function riwwppp.buildClass(class)
                 template = template .. "\tself."..data.name.." = value\n"
             template = template .. "end\n"
         end
+    end
+
+    for _, method in ipairs(class.methods) do
+        template = template .. "\n"
+        template = template .. "function " .. class.name .. ":" .. method.name .. "(" .. method.args .. ")"
+            template = template .. method.body
+        template = template .. "end\n"
     end
 
     template = template .. "\n" .. class.name .. "._constructor = " .. class.name .. "." .. (class.constructor or "new") .. "\n"
