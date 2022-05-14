@@ -142,6 +142,13 @@ Person._constructor = Person.new
 |  safe |  Adds typecheck in setter if type is setted |
 |  const |  Adds getter with inlined value |
 
+## Pragmas
+
+|  name  | description |
+| ------------ | ------------ |
+|  capitalizeMethods |  Capitalizes `set` and `get` in setters and getters |
+|  safe |  All ```@data``` instructions have safe modifier by default |
+
 ## Usage
 
 ```lua
