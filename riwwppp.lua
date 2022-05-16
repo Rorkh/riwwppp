@@ -14,16 +14,22 @@ local alpha = R("az")+R("AZ")
 
 local rBracket = P("[")^1
 local lBracket = P("]")^1
+local equals = P("=")^1
 
 local word = alpha^1
 local instr = P("@")
 
 local attributes = rBracket * C(word) * (" " * C(word))^0 * lBracket
+local value = lpeg.P(space * equals * space * C(word))
 
+-- Simple instruction
 local sInstruction = P(instr * C(word) * space * C(word))
-local aInstruction = P(instr * C(word) * space * Ct(attributes) * space * C(word)) 
+-- Attributed instruction
+local aInstruction = P(instr * C(word) * space * Ct(attributes) * space * C(word))
+-- Valued instruction
+local vInstruction = (sInstruction * value) + (aInstruction * value)
 
-local instruction = sInstruction + aInstruction
+local instruction = vInstruction + sInstruction + aInstruction
 
-local name, attributes, value = instruction:match("@hello [a b c] world")
-print(name, attributes, value)
+local instr, attributes, name, value = instruction:match("@hello world")
+print(instr, attributes, name, value)
