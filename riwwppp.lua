@@ -79,20 +79,28 @@ local instructions = {
         for _, mod in ipairs(attribs) do dataField.modifiers[mod] = true end
 
         table.insert(class.dataFields, dataField)
+    end,
+
+    ["method"] = function(class, name, args)
+        print(1)
+        class.method = {name = name, args = table.concat(args, ","), body = ""}
+    end,
+
+    ["end"] = function(class)
+        print(2)
+        table.insert(class.methods, class.method)
+        class.method = nil
     end
 }
 
 local function preprocess(str)
-    print("trying to preproc " .. (str or "nil"))
     if not str then return end
 
     local matches = grammar.expressions:match(str)
-    if not matches then print("nm") return str end
+    if not matches then return str end
 
     for _, expr in ipairs(matches) do
         str = utils.gsub(str, "\\" .. expr .. "\\", tostring(ret(expr)))
-        print("Repled", "\\" .. expr .. "\\", ret(expr))
-        print("We have " .. str)
     end
 
     return str
@@ -103,21 +111,32 @@ function riwwppp.parseClass(str)
     
     for line in str:gmatch("[^\r\n]+") do
         local instruction, f2, f3, f4 = grammar.instruction:match(line)
-        local value, default, attribs
 
-        if type(f2) == "table" then
-            attribs = f2
-            value = f3
-            default = f4
+        if class.method and instruction ~= "end" then
+            class.method.body = class.method.body .. "\n" .. line 
         else
-            value = f2
-            default = f3
-        end
 
-        if instructions[instruction] then
-            instructions[instruction](class, value, preprocess(default), attribs or {})
-        else
-            print("Unknown instruction " .. instruction .. " used")
+            if instruction == "method" then
+                local method, args = grammar.method:match(line)
+                instructions["method"](class, method, args)
+            else
+                local value, default, attribs
+
+                if type(f2) == "table" then
+                    attribs = f2
+                    value = f3
+                    default = f4
+                else
+                    value = f2
+                    default = f3
+                end
+
+                if instructions[instruction] then
+                    instructions[instruction](class, value, preprocess(default), attribs or {})
+                else
+                    print("Unknown instruction " .. instruction .. " used")
+                end
+            end
         end
     end
 
@@ -182,7 +201,7 @@ function riwwppp.buildClass(class)
         template = template .. "\n"
         template = template .. "function " .. class.name .. ":" .. method.name .. "(" .. method.args .. ")"
             template = template .. method.body
-        template = template .. "end\n"
+        template = template .. "\nend\n"
     end
 
     template = template .. "\n" .. class.name .. "._constructor = " .. class.name .. "." .. (class.constructor or "new") .. "\n"
@@ -192,13 +211,15 @@ function riwwppp.buildClass(class)
     return template
 end
 
-local test = [[
-@class Help
-@pragma capitalizeMethods
+function riwwppp.load(str)
+    local class = riwwppp.parseClass(str)
+    load(riwwppp.buildClass(class))()
+end
 
-@data key
-@field flag = \bit.bor(0,1)\
-]]
+function riwwppp.loadFile(filename)
+    local f = io.open(filename, "r")
+    riwwppp.load(f:read("*a"))
+    f:close()
+end
 
-local class = riwwppp.parseClass(test)
-riwwppp.buildClass(class)
+return riwwppp
