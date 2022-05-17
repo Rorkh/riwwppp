@@ -1,5 +1,8 @@
 # riwwppp
  Classes description language for Lua
+ ## Alarm!
+ [lpeg-dev](https://github.com/Rorkh/riwwppp/tree/lpeg-dev/) branch what internally uses lpeg in active develpment with few more features realized and features in plans.
+ See [PR](https://github.com/Rorkh/riwwppp/pull/1 "PR#1") to stay tuned.
 ## Content
 - [Exports](#exports)
 - [Instructions](#instructions)
