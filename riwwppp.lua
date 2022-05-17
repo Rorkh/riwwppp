@@ -1,186 +1,13 @@
+local success, lpeg = pcall(require, "lpeg")
+lpeg = success and lpeg or require("lulpeg"):register(not _ENV and _G)
+
 local riwwppp = {debug = true}
 
-local function capitalize(str)
-    str = str:gsub("(%l)(%w*)", function(a,b) return string.upper(a)..b end)
-    return str
-end
+local utils = require("riwwppp.utils")
+local grammar = require("riwwppp.grammar")
 
-local function ret(str)
-    return load("return " .. str)()
-end
-
-local function isWhitespace(str)
-    return str:match("^%s*(.-)%s*$") == ""
-end
-
-local instructions = {
-    ["pragma"] = function(class, value)
-        class.pragma = class.pragma or {}
-        class.pragma[value] = true
-    end,
-
-    ["extends"] = function(class, value)
-        if not class.name then 
-            print("Trying to extend before class naming. Ignoring.")
-            return
-        end
-
-        if not ret(value) then 
-            print("Class " .. class.name .. " trying to inherit unregistered class " .. value .. ". Ignoring.") 
-            return
-        end
-
-        class.extends = value
-    end,
-
-    ["class"] = function(class, value)
-        class.name = value
-    end,
-
-    ["constructor"] = function(class, value)
-        class.constructor = value
-    end,
-
-    ["field"] = function(class, value)
-        local pointer = 0
-        local name, default = "", "", ""
-
-        local STATE_NAME = 1
-        local STATE_VALUE = 2
-
-        local state = STATE_NAME
-
-        while (pointer ~= #value) do
-            pointer = pointer + 1
-            local char = string.sub(value, pointer, pointer)
-
-            if state == STATE_NAME then
-                if string.sub(value, pointer + 1, pointer + 1) == "=" then
-                    pointer = pointer + 3
-                    char = string.sub(value, pointer, pointer)
-
-                    state = STATE_VALUE
-                else
-                    name = name .. char
-                end
-            end
-
-            if state == STATE_VALUE then
-                default = default .. char
-            end
-        end
-
-        class.fields = class.fields or {}
-
-        local field = {name = name}
-        if isWhitespace(default) then field.default = default end
-        table.insert(class.fields, field)
-    end,
-
-    ["data"] = function(class, value)
-        local pointer = 0
-        local modifiers, name, default = "", "", ""
-
-        local STATE_MODIFIER = 100
-
-        local STATE_NAME = 1
-        local STATE_VALUE = 2
-
-        local state = STATE_NAME
-
-        while (pointer ~= #value) do
-            pointer = pointer + 1
-            local char = string.sub(value, pointer, pointer)
-
-            if char == "]" then
-                state = STATE_NAME
-
-                pointer = pointer + 2
-                char = string.sub(value, pointer, pointer)
-            end
-
-            if state == STATE_MODIFIER then  modifiers = modifiers .. char end
-            if char == "[" then
-                state = STATE_MODIFIER
-            end
-
-            if state == STATE_NAME then
-                if string.sub(value, pointer + 1, pointer + 1) == "=" then
-                    pointer = pointer + 3
-                    char = string.sub(value, pointer, pointer)
-
-                    state = STATE_VALUE
-                else
-                    name = name .. char
-                end
-            end
-
-            if state == STATE_VALUE then
-                default = default .. char
-            end
-        end
-
-        class.dataFields = class.dataFields or {}
-
-        local dataField = {modifiers = {}, name = name}
-        if not isWhitespace(default) then dataField.default = default end
-
-        for mod in modifiers:gmatch("%S+") do
-            dataField.modifiers[mod] = true
-        end
-        
-        table.insert(class.dataFields, dataField)
-    end,
-
-    ["method"] = function(class, value, pointer)
-        -- @method and space offset
-        class._methodStart = pointer - string.len(value)
-    end,
-
-    ["end"] = function(class, value, pointer, str)
-        -- Maybe rethink
-
-        local mStart = class._methodStart
-        class._methodStart = nil
-        local mEnd = pointer - 5
-
-        local func = str:sub(mStart, mEnd)
-        local lPointer = 0
-
-        local STATE_NAME = 1
-        local STATE_ARGS = 2
-        local STATE_BODY = 3
-
-        local state = STATE_NAME
-        local name, args, body = "", "", ""
-
-        while (lPointer ~= #func) do
-            lPointer = lPointer + 1
-            local char = string.sub(func, lPointer, lPointer)
-
-            if char == "(" and state == STATE_NAME then
-                state = STATE_ARGS
-                lPointer = lPointer + 1
-                char = string.sub(func, lPointer, lPointer)
-            end
-
-            if char == ")" and state == STATE_ARGS then
-                state = STATE_BODY
-                lPointer = lPointer + 1
-                char = string.sub(func, lPointer, lPointer)
-            end
-
-            if string.byte(char) == 10 and state == STATE_NAME then state = STATE_BODY end
-
-            if state == STATE_BODY then body = body .. char end
-            if state == STATE_ARGS then args = args .. char end
-            if state == STATE_NAME then name = name .. char end
-        end
-
-        local method = {name = name, body = body, args = args}
-        table.insert(class.methods, method)
-    end
-}
+local ret = utils.ret
+local capitalize = utils.capitalize
 
 local typeModifiers = {
     ["string"] = true,
@@ -210,49 +37,106 @@ local function proccessModifiers(class)
     end
 end
 
-local function instruction(class, str, pointer, len)
-    local name, value, modifier = "", ""
-    local state = 0
-    
-    while (pointer ~= len) do
-        pointer = pointer + 1
-        
-        local char = string.sub(str, pointer, pointer)
-        
-        if string.byte(char) == 10 then break end
+local instructions = {
+    ["pragma"] = function(class, value)
+        class.pragma = class.pragma or {}
+        class.pragma[value] = true
+    end,
 
-        if string.byte(char) == 32 and state ~= 1 then 
-            state = 1
-
-            pointer = pointer + 1
-            char = string.sub(str, pointer, pointer)
+    ["extends"] = function(class, value)
+        if not class.name then 
+            print("Trying to extend before class naming. Ignoring.")
+            return
         end
 
-        if state == 0 then name = name .. char end
-        if state == 1 then value = value .. char end
+        if not utils.ret(value) then 
+            print("Class " .. class.name .. " trying to inherit unregistered class " .. value .. ". Ignoring.") 
+            return
+        end
+
+        class.extends = value
+    end,
+
+    ["class"] = function(class, value)
+        class.name = value
+    end,
+
+    ["constructor"] = function(class, value)
+        class.constructor = value
+    end,
+
+    ["field"] = function(class, value, default, attribs)
+        class.fields = class.fields or {}
+
+        local field = {name = value, default = default}
+        table.insert(class.fields, field)
+    end,
+
+    ["data"] = function(class, value, default, attribs)
+        class.dataFields = class.dataFields or {}
+
+        local dataField = {modifiers = {}, name = value, default = default}
+        for _, mod in ipairs(attribs) do dataField.modifiers[mod] = true end
+
+        table.insert(class.dataFields, dataField)
+    end,
+
+    ["method"] = function(class, name, args)
+        print(1)
+        class.method = {name = name, args = table.concat(args, ","), body = ""}
+    end,
+
+    ["end"] = function(class)
+        print(2)
+        table.insert(class.methods, class.method)
+        class.method = nil
     end
-    
-    if instructions[name] then
-        instructions[name](class, value, pointer, str)
-    else
-        print("Unknown instruction " .. name .. " used")
+}
+
+local function preprocess(str)
+    if not str then return end
+
+    local matches = grammar.expressions:match(str)
+    if not matches then return str end
+
+    for _, expr in ipairs(matches) do
+        str = utils.gsub(str, "\\" .. expr .. "\\", tostring(ret(expr)))
     end
-    
-    return pointer
+
+    return str
 end
 
 function riwwppp.parseClass(str)
-    local len = #str
-    local pointer = 0
-
     local class = {fields = {}, dataFields = {}, pragma = {}, methods = {}}
     
-    while (pointer ~= len) do
-        pointer = pointer + 1
-        local char = string.sub(str, pointer, pointer)
-        
-        if char == "@" then 
-            pointer = instruction(class, str, pointer, len)
+    for line in str:gmatch("[^\r\n]+") do
+        local instruction, f2, f3, f4 = grammar.instruction:match(line)
+
+        if class.method and instruction ~= "end" then
+            class.method.body = class.method.body .. "\n" .. line 
+        else
+
+            if instruction == "method" then
+                local method, args = grammar.method:match(line)
+                instructions["method"](class, method, args)
+            else
+                local value, default, attribs
+
+                if type(f2) == "table" then
+                    attribs = f2
+                    value = f3
+                    default = f4
+                else
+                    value = f2
+                    default = f3
+                end
+
+                if instructions[instruction] then
+                    instructions[instruction](class, value, preprocess(default), attribs or {})
+                else
+                    print("Unknown instruction " .. instruction .. " used")
+                end
+            end
         end
     end
 
@@ -317,7 +201,7 @@ function riwwppp.buildClass(class)
         template = template .. "\n"
         template = template .. "function " .. class.name .. ":" .. method.name .. "(" .. method.args .. ")"
             template = template .. method.body
-        template = template .. "end\n"
+        template = template .. "\nend\n"
     end
 
     template = template .. "\n" .. class.name .. "._constructor = " .. class.name .. "." .. (class.constructor or "new") .. "\n"
